@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Processing UI</title>
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f6fb;
+      color: #1f2937;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      color: #111827;
+    }
+
+    h1 {
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      padding: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 15px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+      background: #f9fafb;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .badge.pending { background: #fef3c7; color: #92400e; }
+    .badge.on_hold { background: #ede9fe; color: #6d28d9; }
+    .badge.pending_payment { background: #e0f2fe; color: #0c4a6e; }
+    .badge.confirmed { background: #dcfce7; color: #166534; }
+    .badge.processing { background: #f0fdf4; color: #166534; }
+    .badge.shipped { background: #eff6ff; color: #1d4ed8; }
+    .badge.delivered { background: #d1fae5; color: #166534; }
+    .badge.returning { background: #fef3c7; color: #92400e; }
+    .badge.returned { background: #fee2e2; color: #991b1b; }
+    .badge.refunded { background: #ecfccb; color: #365314; }
+    .badge.cancelled { background: #fbefef; color: #991b1b; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    pre {
+      background: #f9fafb;
+      padding: 16px;
+      border-radius: 14px;
+      overflow-x: auto;
+      border: 1px solid #e5e7eb;
+      font-size: 0.95rem;
+    }
+
+    .status-container {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hint {
+      font-size: 0.93rem;
+      color: #475569;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Order Processing UI</h1>
+    <p class="hint">Interactúa con los endpoints REST del servicio y ve el estado de la orden según el SDD.</p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Crear orden</h2>
+        <label for="create-products">Product IDs (coma separada)</label>
+        <input id="create-products" type="text" placeholder="prod1, prod2" />
+
+        <label for="create-amount">Amount</label>
+        <input id="create-amount" type="number" step="0.01" placeholder="150.00" />
+
+        <button id="create-order-btn">Crear orden</button>
+        <p id="create-order-result" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h2>Cargar orden</h2>
+        <label for="load-order-id">Order ID</label>
+        <input id="load-order-id" type="text" placeholder="UUID de la orden" />
+        <button id="load-order-btn">Cargar orden</button>
+        <p id="load-order-result" class="hint"></p>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Orden actual</h2>
+      <div class="status-container">
+        <strong>ID:</strong> <span id="current-order-id">-</span>
+      </div>
+      <div class="status-container">
+        <strong>Status:</strong> <span id="current-order-status" class="badge pending">-</span>
+      </div>
+      <div class="status-container">
+        <strong>Monto:</strong> <span id="current-order-amount">-</span>
+      </div>
+      <div class="status-container">
+        <strong>Productos:</strong> <span id="current-order-products">-</span>
+      </div>
+      <div class="status-container">
+        <strong>Tickets generados:</strong> <span id="current-order-tickets">0</span>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <h3>Trigger evento</h3>
+        <label for="event-type">Event type</label>
+        <select id="event-type"></select>
+
+        <label for="event-metadata">Metadata (JSON)</label>
+        <textarea id="event-metadata" rows="5" placeholder='{"reason":"test"}'></textarea>
+
+        <button id="trigger-event-btn">Disparar evento</button>
+        <p id="event-result" class="hint"></p>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <h3>Historial de estados</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Evento</th>
+              <th>Desde</th>
+              <th>Hacia</th>
+              <th>Metadata</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td colspan="5">No hay orden cargada</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Estado actual y transiciones posibles</h2>
+      <p class="hint">Esto muestra qué eventos están permitidos desde el estado actual según el SDD.</p>
+      <pre id="debug-output"></pre>
+    </section>
+  </div>
+
+  <script>
+    const baseUrl = "http://127.0.0.1:8000";
+
+    const stateTransitions = {
+      PENDING: [
+        "pendingBiometricalVerification",
+        "noVerificationNeeded",
+        "paymentFailed",
+        "orderCancelled",
+        "orderCancelledByUser",
+      ],
+      ON_HOLD: [
+        "biometricalVerificationSuccessful",
+        "verificationFailed",
+        "orderCancelledByUser",
+      ],
+      PENDING_PAYMENT: ["paymentSuccessful", "orderCancelledByUser"],
+      CONFIRMED: ["preparingShipment", "orderCancelledByUser"],
+      PROCESSING: ["itemDispatched", "orderCancelledByUser"],
+      SHIPPED: ["itemReceivedByCustomer", "deliveryIssue", "orderCancelledByUser"],
+      DELIVERED: ["returnInitiatedByCustomer"],
+      RETURNING: ["itemReceivedBack"],
+      RETURNED: ["refundProcessed"],
+      REFUNDED: [],
+      CANCELLED: [],
+    };
+
+    const statusClassMap = {
+      PENDING: "pending",
+      ON_HOLD: "on_hold",
+      PENDING_PAYMENT: "pending_payment",
+      CONFIRMED: "confirmed",
+      PROCESSING: "processing",
+      SHIPPED: "shipped",
+      DELIVERED: "delivered",
+      RETURNING: "returning",
+      RETURNED: "returned",
+      REFUNDED: "refunded",
+      CANCELLED: "cancelled",
+    };
+
+    const createOrderBtn = document.getElementById("create-order-btn");
+    const loadOrderBtn = document.getElementById("load-order-btn");
+    const triggerEventBtn = document.getElementById("trigger-event-btn");
+    const createOrderResult = document.getElementById("create-order-result");
+    const loadOrderResult = document.getElementById("load-order-result");
+    const eventResult = document.getElementById("event-result");
+    const currentOrderId = document.getElementById("current-order-id");
+    const currentOrderStatus = document.getElementById("current-order-status");
+    const currentOrderAmount = document.getElementById("current-order-amount");
+    const currentOrderProducts = document.getElementById("current-order-products");
+    const historyBody = document.getElementById("history-body");
+    const debugOutput = document.getElementById("debug-output");
+    const eventTypeSelect = document.getElementById("event-type");
+
+    let currentOrder = null;
+
+    function setMessage(element, message, isError = false) {
+      element.textContent = message;
+      element.style.color = isError ? "#b91c1c" : "#475569";
+    }
+
+    function formatStateBadge(status) {
+      currentOrderStatus.textContent = status;
+      const cssStatus = statusClassMap[status] || "pending";
+      currentOrderStatus.className = "badge " + cssStatus;
+    }
+
+    function updateOrderView(order) {
+      currentOrder = order;
+      currentOrderId.textContent = order.id;
+      formatStateBadge(order.status);
+      currentOrderAmount.textContent = order.amount;
+      currentOrderProducts.textContent = order.product_ids.join(", ");
+      document.getElementById("current-order-tickets").textContent = order.tickets?.length || 0;
+      populateEventOptions(order.status);
+      renderHistory(order.history);
+      renderDebug(order);
+    }
+
+    function disableOrderView() {
+      currentOrder = null;
+      currentOrderId.textContent = "-";
+      formatStateBadge("PENDING");
+      currentOrderAmount.textContent = "-";
+      currentOrderProducts.textContent = "-";
+      historyBody.innerHTML = `<tr><td colspan="5">No hay orden cargada</td></tr>`;
+      eventTypeSelect.innerHTML = "";
+      debugOutput.textContent = "Ninguna orden cargada.";
+    }
+
+    function renderHistory(history) {
+      if (!history || history.length === 0) {
+        historyBody.innerHTML = `<tr><td colspan="5">No hay eventos en el historial.</td></tr>`;
+        return;
+      }
+
+      historyBody.innerHTML = history
+        .map((entry) => {
+          return `
+            <tr>
+              <td>${entry.event_type}</td>
+              <td>${entry.from_state}</td>
+              <td>${entry.to_state}</td>
+              <td><pre style="margin:0; white-space: pre-wrap;">${JSON.stringify(entry.metadata || {}, null, 2)}</pre></td>
+              <td>${new Date(entry.timestamp).toLocaleString()}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    function renderDebug(order) {
+      const allowed = stateTransitions[order.status] || [];
+      debugOutput.textContent = `Orden ${order.id}\nEstado actual: ${order.status}\nEventos permitidos desde este estado:\n- ${allowed.join("\n- ")}`;
+    }
+
+    function populateEventOptions(status) {
+      const options = stateTransitions[status] || [];
+      eventTypeSelect.innerHTML = "";
+
+      if (options.length === 0) {
+        eventTypeSelect.innerHTML = `<option value="">No hay eventos permitidos</option>`;
+        triggerEventBtn.disabled = true;
+        return;
+      }
+
+      options.forEach((event) => {
+        const opt = document.createElement("option");
+        opt.value = event;
+        opt.textContent = event;
+        eventTypeSelect.appendChild(opt);
+      });
+
+      triggerEventBtn.disabled = false;
+    }
+
+    async function onCreateOrder() {
+      const products = document.getElementById("create-products").value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const amount = parseFloat(document.getElementById("create-amount").value);
+
+      if (!products.length || Number.isNaN(amount) || amount <= 0) {
+        setMessage(createOrderResult, "Completa productos y monto válido.", true);
+        return;
+      }
+
+      setMessage(createOrderResult, "Creando orden...");
+
+      try {
+        const response = await fetch(`${baseUrl}/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_ids: products, amount }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || response.statusText);
+        }
+
+        const order = await response.json();
+        setMessage(createOrderResult, `Orden creada: ${order.id}`);
+        updateOrderView(order);
+      } catch (error) {
+        setMessage(createOrderResult, `Error: ${error.message}`, true);
+      }
+    }
+
+    async function onLoadOrder() {
+      const orderId = document.getElementById("load-order-id").value.trim();
+      if (!orderId) {
+        setMessage(loadOrderResult, "Ingresa un order ID.", true);
+        return;
+      }
+
+      setMessage(loadOrderResult, "Cargando orden...");
+
+      try {
+        const response = await fetch(`${baseUrl}/orders/${orderId}`);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || response.statusText);
+        }
+        const order = await response.json();
+        setMessage(loadOrderResult, `Orden cargada: ${order.id}`);
+        updateOrderView(order);
+      } catch (error) {
+        setMessage(loadOrderResult, `Error: ${error.message}`, true);
+      }
+    }
+
+    async function onTriggerEvent() {
+      if (!currentOrder) {
+        setMessage(eventResult, "Carga una orden antes de disparar un evento.", true);
+        return;
+      }
+
+      const eventType = eventTypeSelect.value;
+      if (!eventType) {
+        setMessage(eventResult, "Selecciona un evento válido.", true);
+        return;
+      }
+
+      const rawMetadata = document.getElementById("event-metadata").value.trim();
+      let metadata = {};
+
+      if (rawMetadata) {
+        try {
+          metadata = JSON.parse(rawMetadata);
+        } catch (error) {
+          setMessage(eventResult, "Metadata debe ser JSON válido.", true);
+          return;
+        }
+      }
+
+      setMessage(eventResult, "Disparando evento...");
+
+      try {
+        const response = await fetch(`${baseUrl}/orders/${currentOrder.id}/events`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_type: eventType, metadata }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || response.statusText);
+        }
+
+        const order = await response.json();
+        const ticketCount = order.tickets?.length || 0;
+        const ticketMessage = ticketCount > 0 ? ` Ticket(s) generados: ${ticketCount}.` : "";
+        setMessage(eventResult, `Evento procesado: ${eventType}.${ticketMessage}`);
+        updateOrderView(order);
+      } catch (error) {
+        setMessage(eventResult, `Error: ${error.message}`, true);
+      }
+    }
+
+    createOrderBtn.addEventListener("click", onCreateOrder);
+    loadOrderBtn.addEventListener("click", onLoadOrder);
+    triggerEventBtn.addEventListener("click", onTriggerEvent);
+
+    disableOrderView();
+  </script>
+</body>
+</html>
